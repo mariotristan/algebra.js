@@ -18,6 +18,8 @@ var Expression = function(variable) {
         this.terms = [variable];
     } else if(typeof(variable) === "undefined") {
         this.terms = [];
+    }else{
+        throw "InvalidArgument";
     }
 };
 
@@ -38,10 +40,11 @@ Expression.prototype.simplify = function() {
         copy.terms[i] = copy.terms[i].simplify();
     }
 
+    copy._sort();
     copy._combineLikeTerms();
+    copy._moveTermsWithDegreeZeroToConstants();
     copy._removeTermsWithCoefficientZero();
     copy.constants = (copy.constant().valueOf() === 0 ? [] : [copy.constant()]);
-    copy._sort();
 
     return copy;
 };
@@ -210,11 +213,12 @@ Expression.prototype.pow = function(a, simplify) {
             }
 
             copy._sort();
-            return copy;
         }
     } else {
         throw "InvalidArgument";
     }
+
+    return (simplify ? copy.simplify() : copy);
 };
 
 Expression.prototype.eval = function(values, simplify) {
@@ -243,10 +247,6 @@ Expression.prototype.summation = function(variable, lower, upper) {
 }
 
 Expression.prototype.toString = function() {
-    if (this.terms.length === 0 && this.constants.length === 0) {
-        return "0";
-    }
-
     var str = "";
 
     for (var i = 0; i < this.terms.length; i++) {
@@ -266,15 +266,11 @@ Expression.prototype.toString = function() {
     } else if (str.substring(0, 3) === " + ") {
         return str.substring(3, str.length);
     } else {
-        return str;
+        return "0";
     }
 };
 
 Expression.prototype.toTex = function(dict) {
-    if (this.terms.length === 0 && this.constants.length === 0) {
-        return "0";
-    }
-
     var str = "";
 
     for (var i = 0; i < this.terms.length; i++) {
@@ -294,7 +290,7 @@ Expression.prototype.toTex = function(dict) {
     } else if (str.substring(0, 3) === " + ") {
         return str.substring(3, str.length);
     } else {
-        return str;
+        return "0";
     }
 };
 
@@ -314,25 +310,59 @@ Expression.prototype._removeTermsWithCoefficientZero = function() {
 };
 
 Expression.prototype._combineLikeTerms = function() {
-    for (var i = 0; i < this.terms.length; i++) {
-        var thisTerm = this.terms[i];
-
-        for (var j = i + 1; j < this.terms.length; j++) {
-            var thatTerm = this.terms[j];
-
-            if (thisTerm.canBeCombinedWith(thatTerm)) {
-                thisTerm = thisTerm.add(thatTerm);
-                this.terms[i] = thisTerm;
-                this.terms.splice(j, 1);
+    function alreadyEncountered(term, encountered) {
+        for (var i = 0; i < encountered.length; i++) {
+            if (term.canBeCombinedWith(encountered[i])) {
+                return true;
             }
         }
 
+        return false;
+    }
+
+    var newTerms = [];
+    var encountered = [];
+
+    for (var i = 0; i < this.terms.length; i++) {
+        var thisTerm = this.terms[i];
+
+        if (alreadyEncountered(thisTerm, encountered)) {
+            continue;
+        } else {
+            for (var j = i + 1; j < this.terms.length; j++) {
+                var thatTerm = this.terms[j];
+
+                if (thisTerm.canBeCombinedWith(thatTerm)) {
+                    thisTerm = thisTerm.add(thatTerm);
+                }
+            }
+
+            newTerms.push(thisTerm);
+            encountered.push(thisTerm);
+        }
+
+    }
+
+    this.terms = newTerms;
+    return this;
+};
+
+Expression.prototype._moveTermsWithDegreeZeroToConstants = function() {
+    var keepTerms = [];
+    var constant = new Fraction(0, 1);
+
+    for (var i = 0; i < this.terms.length; i++) {
+        var thisTerm = this.terms[i];
+
         if (thisTerm.variables.length === 0) {
-            this.constants.push(thisTerm.coefficient());
-            this.terms.splice(i, 1);
+            constant = constant.add(thisTerm.coefficient());
+        } else {
+            keepTerms.push(thisTerm);
         }
     }
 
+    this.constants.push(constant);
+    this.terms = keepTerms;
     return this;
 };
 

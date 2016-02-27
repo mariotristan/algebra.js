@@ -51,6 +51,13 @@ describe("An expression initialized with nothing", function() {
     });
 });
 
+describe("An expression initialized with an invalid variable", function() {
+    it("should throw InvalidArgument",function(){
+        expect(function(){new Expression([1,2,3]);}).toThrow("InvalidArgument");
+    });
+});
+
+
 describe("Expression addition", function() {
     var x = new Expression("x");
     var y = new Expression("y");
@@ -252,6 +259,10 @@ describe("Expression multiplication", function() {
         expect(answer.toString()).toEqual("5x");
     });
 
+    it("should not allow multiplying by floats", function() {
+        expect(function(){x.multiply(0.25)}).toThrow("InvalidArgument");
+    });
+
     it("should allow multiplying by another expression", function() {
         var newX = x.add(y); // x + y
         var newY = y.add(x); // y + x
@@ -439,6 +450,11 @@ describe("Expression printing to tex", function() {
         expect(answer.toTex()).toEqual("-3");
     });
 
+    it("should print 0 if the expression was initialized with nothing", function() {
+        var x = new Expression();
+        expect(x.toTex()).toEqual("0");
+    });
+
     it("prints unsimplified expressions correctly", function() {
         var exp = new Expression("x").add("x", false);
         exp = exp.multiply(new Fraction(3, 4), false); // 3/4x + 3/4x
@@ -471,6 +487,10 @@ describe("Expression evaluation with one variable - linear", function() {
         var answer = x.eval({'x': new Fraction(1, 5)});
 
         expect(answer.toString()).toEqual("16/5");
+    });
+
+    it("should not allow evaluating at floats", function() {
+        expect(function(){x.eval({'x': 1.2})}).toThrow("InvalidArgument");
     });
 });
 
@@ -678,6 +698,10 @@ describe("Raising expressions to powers", function() {
 
         expect(answer.toString()).toEqual("xx + 2x + 2x + 2 * 2");
     });
+
+    it("should not allow floats", function() {
+        expect(function(){x.pow(0.25)}).toThrow("InvalidArgument");
+    });
 });
 
 describe("Expression sorting", function() {
@@ -751,8 +775,28 @@ describe("Expression simplification", function() {
         answer = answer.simplify(); // 12x + 33
 
         expect(answer.toString()).toEqual("12x + 33");
-    })
-});describe("Expression summation", function() {
+    });
+
+    it("should properly simplify if there are only constants", function() {
+        var exp = new Expression("x").add(3); // x + 3
+        exp = exp.pow(2, false); // xx + 3x + 3x + 3 * 3
+        exp = exp.eval({x: 2}, false); // 2 * 2 + 3 * 2 + 3 * 2 + 3 * 3
+
+        var ans = exp.simplify();
+
+        expect(ans.toString()).toEqual("25");
+    });
+
+    it("should properly simplify expressions where terms show up >= 2 times", function() {
+        var exp = new Expression("x").add("y").add(3);
+        var unsimplified = exp.pow(3, false);
+        var simplified = unsimplified.simplify();
+
+        expect(simplified.toString()).toEqual("x^3 + y^3 + 3x^2y + 3y^2x + 9x^2 + 9y^2 + 18xy + 27x + 27y + 27");
+    });
+});
+
+describe("Expression summation", function() {
 	it("should return a sum expressions whose variables have been substituted", function() {
 		var xplus3 = new Expression("x").add(3);
 		var ans = xplus3.summation(new Expression("x"), 3, 6);
